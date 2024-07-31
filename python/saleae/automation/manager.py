@@ -235,6 +235,7 @@ class CaptureConfiguration:
 
 _DEFAULT_GRPC_ADDRESS = '127.0.0.1'
 _DEFAULT_GRPC_PORT = 10430
+_DEFAULT_XVFB_BIN_LOC = "/usr/bin/xvfb-run"
 
 
 class Manager:
@@ -317,7 +318,8 @@ class Manager:
                application_path: Optional[Union[Path, str]] = None,
                connect_timeout_seconds: Optional[float] = None,
                grpc_channel_arguments: Optional[List[Tuple[str, Any]]] = None,
-               port: Optional[int] = None) -> 'Manager':
+               port: Optional[int] = None,
+               headless: bool = False) -> 'Manager':
         """
         Launch the Logic2 application and shut it down when the returned Manager is closed.
 
@@ -326,6 +328,8 @@ class Manager:
         :param connect_timeout_seconds: See __init__
         :param grpc_channel_arguments: See __init__
         :param port: Port to use for the gRPC server. If not specified, 10430 will be used.
+        :param headless: If True, use xvfb-run to run the application. Only applies to Linux
+                         subsystems.
 
         """
 
@@ -362,7 +366,16 @@ class Manager:
         if port is None:
             port = _DEFAULT_GRPC_PORT
 
-        process = subprocess.Popen([logic2_bin, '--automation', '--automationPort', str(port)],
+        subprocess_args = [logic2_bin, '--automation', '--automationPort', str(port)]
+        if headless:
+            if system != 'Linux':
+                raise RuntimeError(f"Headless mode only supported on Linux!")
+            if not os.path.exists(_DEFAULT_XVFB_BIN_LOC):
+                raise RuntimeError(f"xvfb-run not found! Follow headless installation instructions "
+                                   f"at: https://saleae.github.io/logic2-automation/getting_started.html#headless-on-linux")
+            subprocess_args = [_DEFAULT_XVFB_BIN_LOC] + subprocess_args
+
+        process = subprocess.Popen(subprocess_args,
                                    stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL)
 
